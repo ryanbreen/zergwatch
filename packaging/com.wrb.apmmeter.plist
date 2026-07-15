@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+Before installing, replace /ABSOLUTE/PATH/TO/ZergWatch.app below with the
+actual absolute path to your built ZergWatch.app (e.g. from ./build-app.sh).
+
+Then copy this file to ~/Library/LaunchAgents/ and bootstrap it:
+
+    ./build-app.sh
+    cp packaging/com.wrb.apmmeter.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.wrb.apmmeter.plist
+
+To stop it:
+
+    launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.wrb.apmmeter.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.wrb.apmmeter</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/ABSOLUTE/PATH/TO/ZergWatch.app/Contents/MacOS/ZergWatch</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/zergwatch.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/zergwatch.err.log</string>
+</dict>
+</plist>

@@ -1,0 +1,6 @@
+.build/
+*.log
+signing/
+ZergWatch.app/
+*.p12
+.DS_Store
