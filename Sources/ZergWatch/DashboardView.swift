@@ -102,11 +102,24 @@ struct DashboardView: View {
                 .frame(minWidth: 230)
             }
 
-            HourlyChart(
-                points: store.chartPoints(mode: chartMode),
-                currentHour: store.currentHour
-            )
+            // All three charts are built once and kept alive; switching metric
+            // just toggles which one is opaque. Because each is `.equatable()`
+            // and its data (the throttled snapshot) is unchanged by the switch,
+            // flipping the picker does NOT rebuild any Swift Charts layout — it
+            // is a pure opacity change, so it's instant instead of ~100 ms.
+            ZStack {
+                ForEach(ChartMetricMode.allCases) { mode in
+                    HourlyChart(
+                        points: store.chartPoints(mode: mode),
+                        currentHour: store.currentHour
+                    )
+                    .equatable()
+                    .opacity(mode == chartMode ? 1 : 0)
+                    .allowsHitTesting(mode == chartMode)
+                }
+            }
             .frame(height: 180)
+            .animation(nil, value: chartMode)
         }
         .padding(12)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -207,9 +220,15 @@ private struct StatTile: View {
     }
 }
 
-private struct HourlyChart: View {
+private struct HourlyChart: View, Equatable {
     let points: [HourChartPoint]
     let currentHour: Int
+    // Equatable (synthesized) so `.equatable()` at the call site skips the
+    // expensive Swift Charts rebuild when the underlying data hasn't changed.
+    // The store republishes on every keystroke/click and once per second from
+    // the liveAPM timer; without this the chart re-lays-out on every one of
+    // those, saturating the main thread and making tab switches lag for
+    // seconds. Now it only rebuilds when `points` or `currentHour` change.
 
     var body: some View {
         Chart {

@@ -24,6 +24,13 @@ final class APMStore: ObservableObject, @unchecked Sendable {
     @Published private(set) var isPaused: Bool = false
     @Published private(set) var lastPersistenceError: String?
 
+    // Throttled snapshot of the hourly buckets that drives the chart. Refreshed
+    // at most ~1 Hz (from refreshLiveAPM on the 1 s timer), NOT on every event,
+    // so the expensive Swift Charts layout never rebuilds per keystroke. Hourly
+    // bars barely move second-to-second, so 1 Hz is visually indistinguishable
+    // from live. chartPoints(mode:) reads this, never the live `day`.
+    @Published private(set) var chartHourly: [HourBucket] = Array(repeating: HourBucket(), count: 24)
+
     let applicationSupportDirectory: URL
 
     private let fileManager: FileManager
@@ -45,6 +52,17 @@ final class APMStore: ObservableObject, @unchecked Sendable {
         self.day = DayStats(date: Self.localDayString(for: Date()))
         createApplicationSupportDirectory()
         loadToday()
+        chartHourly = day.hourly
+    }
+
+    /// Copy the live hourly buckets into the throttled chart snapshot, but only
+    /// when they actually changed (so we don't republish — and rebuild the
+    /// chart — on no-op ticks). Called on the 1 s timer and after any full-day
+    /// reset/roll/load so the chart is at most ~1 s stale.
+    private func syncChartSnapshot() {
+        if chartHourly != day.hourly {
+            chartHourly = day.hourly
+        }
     }
 
     var totalActions: Int {
@@ -131,6 +149,7 @@ final class APMStore: ObservableObject, @unchecked Sendable {
         day = DayStats(date: Self.localDayString(for: Date()))
         actionTimestamps.removeAll(keepingCapacity: true)
         liveAPM = 0
+        syncChartSnapshot()
         save()
     }
 
@@ -143,6 +162,7 @@ final class APMStore: ObservableObject, @unchecked Sendable {
         day = DayStats(date: today)
         actionTimestamps.removeAll(keepingCapacity: true)
         liveAPM = 0
+        syncChartSnapshot()
         save()
     }
 
@@ -191,6 +211,7 @@ final class APMStore: ObservableObject, @unchecked Sendable {
     func refreshLiveAPM(now: Date = Date()) {
         rollToCurrentDayIfNeeded(now: now)
         updateLiveAPM(now: now)
+        syncChartSnapshot()
     }
 
     func setAccessibilityTrusted(_ trusted: Bool) {
@@ -268,7 +289,7 @@ final class APMStore: ObservableObject, @unchecked Sendable {
     }
 
     func chartPoints(mode: ChartMetricMode) -> [HourChartPoint] {
-        day.hourly.enumerated().flatMap { hour, bucket in
+        chartHourly.enumerated().flatMap { hour, bucket in
             switch mode {
             case .both:
                 [
